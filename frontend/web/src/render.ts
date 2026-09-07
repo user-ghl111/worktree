@@ -1,5 +1,6 @@
 import type { Node, Reminder } from '@worktree/core';
 import type { DisplayPrefs } from './config';
+import { formatLocalDateTime } from './time';
 
 const SHORT_ID_LEN = 4;
 
@@ -49,7 +50,7 @@ export function formatNode(node: Node, display: DisplayPrefs): string {
         case 'weight':
           return `w:${part.weight}`;
         case 'deadline':
-          return `⏰${new Date(part.ms).toISOString()}`;
+          return `⏰${formatLocalDateTime(part.ms)}`;
         case 'note':
           return `✎ ${part.text}`;
         case 'reminders':
@@ -60,7 +61,7 @@ export function formatNode(node: Node, display: DisplayPrefs): string {
 }
 
 export function formatReminder(r: Reminder): string {
-  const when = new Date(r.deadline).toISOString();
+  const when = formatLocalDateTime(r.deadline);
   const repeat = r.repeat !== undefined ? `+${r.repeat}ms` : '';
   const active = r.active ? '' : '/off';
   return `${r.name ?? ''}@${when}${repeat}${active}`;
