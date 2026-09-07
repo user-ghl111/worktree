@@ -24,7 +24,7 @@ export function formatNode(node: Node): string {
   const parts = [node.name, `[${shortId(node.id)}]`];
   if (node.status) parts.push('✔');
   parts.push(`w:${node.weight}`);
-  if (node.deadline !== undefined) parts.push(`⏰${new Date(node.deadline).toISOString()}`);
+  if (node.deadline !== undefined) parts.push(`⏰${formatLocalDateTime(node.deadline)}`);
   if (node.note !== '') parts.push(`✎ ${node.note}`);
   if (node.reminders.length > 0) {
     parts.push(`R(${node.reminders.length}):${node.reminders.map(formatReminder).join(', ')}`);
@@ -79,7 +79,7 @@ export function renderFiltered(root: Node, filter: NodeFilter, mode: FilterDispl
 }
 
 function formatReminder(r: Reminder): string {
-  const when = new Date(r.deadline).toISOString();
+  const when = formatLocalDateTime(r.deadline);
   const repeat = r.repeat !== undefined ? `+${r.repeat}ms` : '';
   const active = r.active ? '' : '/off';
   return `${r.name ?? ''}@${when}${repeat}${active}`;
@@ -91,6 +91,14 @@ const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export function formatTime(ms: number): string {
   const d = new Date(ms);
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+/** Local-time `YYYY-MM-DD HH:MM:SS`. */
+export function formatLocalDateTime(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  const date = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return `${date} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 /** Local-time `YYYY-MM-DD Weekday`. */

@@ -5,6 +5,7 @@ import type { Node } from '@worktree/core';
 import type { DisplayPrefs } from '../config';
 import { nodeRowParts, shortId } from '../render';
 import type { NodeRowPart } from '../render';
+import { formatLocalDateTime } from '../time';
 import { CheckIcon, ClockIcon, PencilIcon } from './icons';
 
 /** Icons for the markers formatNode renders as glyphs (✔ ⏰ ✎). */
@@ -38,7 +39,7 @@ function renderPart(part: NodeRowPart): ReactNode {
       return (
         <span className="inline-flex items-center gap-0.5">
           <ClockIcon className={markerClass} />
-          {new Date(part.ms).toISOString()}
+          {formatLocalDateTime(part.ms)}
         </span>
       );
     case 'note':

@@ -42,11 +42,11 @@ describe('renderTree', () => {
     const tree = Tree.fromOps([
       { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'a', weight: 1 },
       { kind: 'complete', id: 'aaaa-1' },
-      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r1', name: 'R', deadline: 1000, repeat: 60 },
+      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r1', name: 'R', deadline: new Date(1970, 0, 1, 0, 0, 1).getTime(), repeat: 60 },
     ]);
     const out = renderTree(tree.getRoot());
     expect(out).toContain('a [aaaa] ✔ w:1');
-    expect(out).toContain('R(1):R@1970-01-01T00:00:01.000Z+60ms');
+    expect(out).toContain('R(1):R@1970-01-01 00:00:01+60ms');
   });
 
   it('renders a subtree with the node itself as the root line', () => {
@@ -61,19 +61,27 @@ describe('renderTree', () => {
   it('marks inactive reminders', () => {
     const tree = Tree.fromOps([
       { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'a', weight: 1 },
-      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r1', name: 'R', deadline: 1000 },
+      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r1', name: 'R', deadline: new Date(1970, 0, 1, 0, 0, 1).getTime() },
       { kind: 'edit_reminder', rmdId: 'r1', active: false },
     ]);
-    expect(renderTree(tree.getRoot())).toContain('R(1):R@1970-01-01T00:00:01.000Z/off');
+    expect(renderTree(tree.getRoot())).toContain('R(1):R@1970-01-01 00:00:01/off');
   });
 
   it('shows deadline and note tokens only when present', () => {
     const tree = Tree.fromOps([
-      { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'a', weight: 1, deadline: 1000, note: 'hi' },
+      {
+        kind: 'add',
+        parentId: ROOT_ID,
+        id: 'aaaa-1',
+        name: 'a',
+        weight: 1,
+        deadline: new Date(1970, 0, 1, 0, 0, 1).getTime(),
+        note: 'hi',
+      },
       { kind: 'add', parentId: ROOT_ID, id: 'bbbb-1', name: 'b', weight: 2 },
     ]);
     const out = renderTree(tree.getRoot());
-    expect(out).toContain('a [aaaa] w:1 ⏰1970-01-01T00:00:01.000Z ✎ hi');
+    expect(out).toContain('a [aaaa] w:1 ⏰1970-01-01 00:00:01 ✎ hi');
     expect(out).toContain('b [bbbb] w:2');
   });
 });
