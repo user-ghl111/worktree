@@ -31,6 +31,15 @@ describe('completeLine — commands', () => {
     expect(hits).toEqual(['reconnect ']);
     expect(replacement).toBe('reco');
   });
+
+  it('completes cpl flags and a ref after them', () => {
+    const [flagHits, flagReplacement] = completeLine(build().getRoot(), ROOT_ID, 'cpl -');
+    expect(flagHits).toEqual(['-f', '--force']);
+    expect(flagReplacement).toBe('-');
+    const [refHits, refReplacement] = completeLine(build().getRoot(), ROOT_ID, 'cpl -f ');
+    expect(refHits).toEqual(['alpha', 'beta', 'alpine']);
+    expect(refReplacement).toBe('');
+  });
 });
 
 describe('completeLine — refs', () => {

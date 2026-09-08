@@ -218,6 +218,7 @@ export class WorktreeClient {
   }
 
   setCompleted(id: string, completed: boolean): void {
+    if (completed) this.ensureCompletable(id);
     this.apply({ kind: completed ? 'complete' : 'uncomplete', id });
   }
 
@@ -276,6 +277,8 @@ export class WorktreeClient {
   }
 
   setBlockCompleted(id: string, completed: boolean): void {
+    const block = this.getBlocks().find((b) => b.id === id);
+    if (completed && block?.nodeId !== undefined) this.ensureCompletable(block.nodeId);
     this.apply({ kind: completed ? 'complete_block' : 'uncomplete_block', id });
   }
 
@@ -312,6 +315,18 @@ export class WorktreeClient {
   private ensureUniqueSiblingName(parent: Node, name: string, excludeId?: string): void {
     if (parent.children.some((c) => c.id !== excludeId && c.name === name)) {
       throw new Error(`a sibling named "${name}" already exists under "${parent.id === ROOT_ID ? '/' : parent.name}"`);
+    }
+  }
+
+  /** Local pre-check mirroring the core rule: a node may only be completed
+   *  once all of its children are completed. Unknown ids pass through — the
+   *  core apply rejects them. */
+  private ensureCompletable(id: string): void {
+    const node = findNode(this.getTree(), id);
+    if (!node) return;
+    const pending = node.children.find((c) => !c.status);
+    if (pending !== undefined) {
+      throw new Error(`cannot complete "${node.name}": child "${pending.name}" is not completed`);
     }
   }
 

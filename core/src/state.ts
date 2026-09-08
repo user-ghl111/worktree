@@ -34,8 +34,7 @@ export class WorktreeState {
     switch (op.kind) {
       case 'complete':
       case 'uncomplete': {
-        this.tree.apply(op);
-        this.calendar.setStatusForNode(op.id, op.kind === 'complete');
+        this.syncChanged(this.tree.apply(op));
         return;
       }
       case 'remove': {
@@ -67,7 +66,7 @@ export class WorktreeState {
         if (block === undefined) throw new Error(`unknown block id: ${op.id}`);
         if (block.nodeId !== undefined) {
           // At most one block links a node, so no sibling sync is needed.
-          this.tree.setNodeStatus(block.nodeId, block.status, op.timestamp);
+          this.syncChanged(this.tree.setNodeStatus(block.nodeId, block.status, op.timestamp));
         }
         return;
       }
@@ -75,7 +74,16 @@ export class WorktreeState {
         this.calendar.apply(op);
         return;
       default:
-        this.tree.apply(op);
+        this.syncChanged(this.tree.apply(op));
+    }
+  }
+
+  /** Keeps the invariant: every linked block's status equals its node's status,
+   *  including nodes the derived cascade (un)completed. */
+  private syncChanged(changed: string[]): void {
+    for (const id of changed) {
+      const node = this.tree.getNode(id);
+      if (node !== undefined) this.calendar.setStatusForNode(id, node.status);
     }
   }
 }

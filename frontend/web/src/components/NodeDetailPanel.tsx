@@ -28,6 +28,16 @@ function parseOptionalWeight(raw: string): number | undefined {
   return n;
 }
 
+/** Post-order (children first) ids of every uncompleted node in the subtree
+ *  rooted at `node` (including `node` itself), so completing them in order
+ *  is always valid. Callers pass `node.children` to get descendants only. */
+function uncompletedSubtree(node: Node): string[] {
+  const ids: string[] = [];
+  for (const child of node.children) ids.push(...uncompletedSubtree(child));
+  if (!node.status) ids.push(node.id);
+  return ids;
+}
+
 export function NodeDetailPanel(props: {
   node: Node;
   client: WorktreeClient;
@@ -77,6 +87,19 @@ export function NodeDetailPanel(props: {
     } catch (e) {
       setError(errMsg(e));
     }
+  };
+
+  const onToggleComplete = (): void => {
+    if (node.status) {
+      client.setCompleted(node.id, false);
+      return;
+    }
+    const pending = node.children.flatMap(uncompletedSubtree);
+    if (pending.length > 0) {
+      if (!window.confirm(t('detail.confirmCompleteTree', { name: node.name, count: pending.length }))) return;
+      for (const id of pending) client.setCompleted(id, true);
+    }
+    client.setCompleted(node.id, true);
   };
 
   const parentLabel = (parentId: string | null, depth: number, name: string): string => {
@@ -201,7 +224,7 @@ export function NodeDetailPanel(props: {
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => run(() => client.setCompleted(node.id, !node.status))}
+              onClick={() => run(onToggleComplete)}
               data-testid="detail-complete"
               className="inline-flex h-8 items-center gap-1.5 rounded bg-green-600 px-2 py-2 text-white hover:bg-green-700 md:py-1"
             >

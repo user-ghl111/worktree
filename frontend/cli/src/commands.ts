@@ -1,5 +1,5 @@
 import { ROOT_ID, USER_RE, computeStats, matchesFilter } from '@worktree/core';
-import type { Block } from '@worktree/core';
+import type { Block, Node } from '@worktree/core';
 import { formatBlock, formatDayHeader, formatNode, renderFiltered, renderTree, shortId } from './render';
 import { pathOf, resolveBlock } from './resolve';
 import { DEFAULT_SERVER } from './config';
@@ -17,6 +17,16 @@ function parseWeight(io: CommandIO, raw: string): number | undefined {
     return undefined;
   }
   return weight;
+}
+
+/** Post-order (children first) ids of every uncompleted node in the subtree
+ *  rooted at `node` (including `node` itself), so completing them in order
+ *  is always valid. Callers pass `node.children` to get descendants only. */
+function uncompletedSubtree(node: Node): string[] {
+  const ids: string[] = [];
+  for (const child of node.children) ids.push(...uncompletedSubtree(child));
+  if (!node.status) ids.push(node.id);
+  return ids;
 }
 
 /** Resolve a block ref; prints the error and returns null when it fails. */
@@ -335,13 +345,27 @@ const cpCommand: Command = {
 const cplCommand: Command = {
   name: 'cpl',
   mutatesTree: true,
-  summary: 'complete a node',
-  usage: 'cpl <ref>',
+  summary: 'complete a node (-f completes its uncompleted children first)',
+  usage: 'cpl [-f] <ref>',
   run: async (io, args): Promise<CommandResult> => {
-    if (args.length < 1) return io.usage();
-    const node = io.refNode(args[0]);
+    let force = false;
+    let ref: string | undefined;
+    for (const a of args) {
+      if (a === '-f' || a === '--force') force = true;
+      else ref = a;
+    }
+    if (ref === undefined) return io.usage();
+    const node = io.refNode(ref);
     if (!node) return 'ok';
-    mutate(() => io.client.setCompleted(node.id, true));
+    const pending = node.children.flatMap(uncompletedSubtree);
+    if (pending.length > 0 && !force) {
+      io.out(`"${node.name}" has ${pending.length} uncompleted child node(s) — use cpl -f to complete them first`);
+      return 'ok';
+    }
+    mutate(() => {
+      for (const id of pending) io.client.setCompleted(id, true);
+      io.client.setCompleted(node.id, true);
+    });
     io.out(`${node.name} completed`);
     await afterCommand(io);
     return 'ok';

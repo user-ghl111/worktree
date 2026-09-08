@@ -11,6 +11,7 @@ export const COMMANDS = REGISTRY.flatMap((c) => [c.name, ...(c.aliases ?? [])]);
 const REMINDER_SUB = ['add', 'rm', 'edit'];
 const RESOLVE_CHOICES = ['server', 'local'];
 const RM_FLAGS = ['-r', '--recursive'];
+const CPL_FLAGS = ['-f', '--force'];
 const USER_SUB = ['current', 'list', 'switch'];
 const FILTER_KEYS = [
   'clear',
@@ -118,10 +119,14 @@ export function completeLine(root: Node, cwdId: string, line: string): [string[]
       if (position === 2) return completeRef(root, cwd, last);
       if (position === 3 && words[1]?.startsWith('-')) return completeRef(root, cwd, last);
       return [[], last];
+    case 'cpl':
+      if (position === 2 && last.startsWith('-')) return completeFixed(CPL_FLAGS, last);
+      if (position === 2) return completeRef(root, cwd, last);
+      if (position === 3 && words[1]?.startsWith('-')) return completeRef(root, cwd, last);
+      return [[], last];
     case 'cd':
     case 'tree':
     case 'ls':
-    case 'cpl':
     case 'uncpl':
     case 'rename':
       if (position === 2) return completeRef(root, cwd, last);

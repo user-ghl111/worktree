@@ -44,7 +44,9 @@ export class Tree {
     return copy;
   }
 
-  apply(op: TreeOperation): void {
+  /** Applies the op and returns the ids whose status changed (the target plus
+   *  any ancestors the derived cascade uncompleted). */
+  apply(op: TreeOperation): string[] {
     switch (op.kind) {
       case 'add': {
         const parent = this.mustGet(op.parentId);
@@ -67,11 +69,11 @@ export class Tree {
         this.sortChildren(parent);
         this.index.set(node.id, node);
         this.parents.set(node.id, op.parentId);
-        break;
+        return this.uncompleteCompletedAncestors(op.id);
       }
       case 'remove':
         this.removeSubtree(op.id);
-        break;
+        return [];
       case 'rename': {
         const node = this.mustGet(op.id);
         this.validateName(op.name);
@@ -79,7 +81,7 @@ export class Tree {
         if (parentId !== undefined) this.ensureUniqueSiblingName(this.mustGet(parentId), op.name, op.id);
         node.name = op.name;
         this.resortSiblings(op.id);
-        break;
+        return [];
       }
       case 'move': {
         const parent = this.mustGet(op.parentId);
@@ -94,7 +96,7 @@ export class Tree {
         parent.children.push(node);
         this.sortChildren(parent);
         this.parents.set(op.id, op.parentId);
-        break;
+        return node.status ? [] : this.uncompleteCompletedAncestors(op.id);
       }
       case 'copy': {
         const parent = this.mustGet(op.parentId);
@@ -121,32 +123,39 @@ export class Tree {
         this.sortChildren(parent);
         this.index.set(clone.id, clone);
         this.parents.set(clone.id, op.parentId);
-        break;
+        return clone.status ? [] : this.uncompleteCompletedAncestors(clone.id);
       }
       case 'complete': {
         const node = this.mustGet(op.id);
+        this.ensureCompletable(node);
+        if (node.status) return [];
         node.status = true;
         node.completedAt = op.timestamp ?? 0;
         this.resortSiblings(op.id);
-        break;
+        return [op.id];
       }
       case 'uncomplete': {
         const node = this.mustGet(op.id);
-        node.status = false;
-        node.completedAt = 0;
-        this.resortSiblings(op.id);
-        break;
+        const changed: string[] = [];
+        if (node.status) {
+          node.status = false;
+          node.completedAt = 0;
+          this.resortSiblings(op.id);
+          changed.push(op.id);
+        }
+        changed.push(...this.uncompleteCompletedAncestors(op.id));
+        return changed;
       }
       case 'add_reminder': {
         const node = this.mustGet(op.nodeId);
         if (node.reminders.some((r) => r.id === op.rmdId)) throw new Error(`duplicate reminder id: ${op.rmdId}`);
         node.reminders.push({ id: op.rmdId, name: op.name, deadline: op.deadline, repeat: op.repeat, active: true });
-        break;
+        return [];
       }
       case 'remove_reminder': {
         const node = this.findReminderNode(op.rmdId);
         if (node) node.reminders = node.reminders.filter((r) => r.id !== op.rmdId);
-        break;
+        return [];
       }
       case 'edit_reminder': {
         if (
@@ -164,7 +173,7 @@ export class Tree {
         if (op.deadline !== undefined) reminder.deadline = op.deadline;
         if (op.repeat !== undefined) reminder.repeat = op.repeat ?? undefined;
         if (op.active !== undefined) reminder.active = op.active;
-        break;
+        return [];
       }
       case 'edit_node': {
         if (op.note === undefined && op.deadline === undefined) {
@@ -173,7 +182,7 @@ export class Tree {
         const node = this.mustGet(op.id);
         if (op.note !== undefined) node.note = op.note;
         if (op.deadline !== undefined) node.deadline = op.deadline ?? undefined;
-        break;
+        return [];
       }
     }
   }
@@ -182,13 +191,21 @@ export class Tree {
    * Derived status change (completion propagation): sets the node's status
    * and re-sorts its siblings, without recording a history op. The
    * `timestamp` of the triggering op dates the completion (0 for legacy
-   * ops), keeping replay deterministic.
+   * ops), keeping replay deterministic. Returns the ids whose status
+   * changed (the target plus any ancestors the cascade uncompleted).
    */
-  setNodeStatus(id: string, status: boolean, timestamp?: Timestamp): void {
+  setNodeStatus(id: string, status: boolean, timestamp?: Timestamp): string[] {
     const node = this.mustGet(id);
-    node.status = status;
-    node.completedAt = status ? (timestamp ?? 0) : 0;
-    this.resortSiblings(id);
+    if (status) this.ensureCompletable(node);
+    const changed: string[] = [];
+    if (node.status !== status) {
+      node.status = status;
+      node.completedAt = status ? (timestamp ?? 0) : 0;
+      this.resortSiblings(id);
+      changed.push(id);
+    }
+    if (!status) changed.push(...this.uncompleteCompletedAncestors(id));
+    return changed;
   }
 
   getRoot(): Node {
@@ -242,6 +259,35 @@ export class Tree {
   private validateName(name: string): void {
     if (name === '') throw new Error('node name must not be empty');
     if (name.includes('/')) throw new Error(`node name must not contain "/": ${name}`);
+  }
+
+  /** A node may only be completed once all of its children are completed. */
+  private ensureCompletable(node: Node): void {
+    const pending = node.children.find((c) => !c.status);
+    if (pending !== undefined) {
+      throw new Error(`cannot complete "${node.name}": child "${pending.name}" is not completed`);
+    }
+  }
+
+  /**
+   * Derived cascade: a completed node may not have an uncompleted child, so
+   * when a node becomes (or appears) uncompleted, every completed ancestor
+   * is uncompleted in turn. Returns the ids that flipped. Never records a
+   * history op — replay derives the same state.
+   */
+  private uncompleteCompletedAncestors(id: string): string[] {
+    const changed: string[] = [];
+    let cur = this.parents.get(id);
+    while (cur !== undefined) {
+      const node = this.mustGet(cur);
+      if (!node.status) break;
+      node.status = false;
+      node.completedAt = 0;
+      this.resortSiblings(node.id);
+      changed.push(node.id);
+      cur = this.parents.get(node.id);
+    }
+    return changed;
   }
 
   /** Sibling names are unique within a parent; `excludeId` exempts the node itself (rename/move). */

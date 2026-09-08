@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { ROOT_ID, WorktreeState } from '@worktree/core';
-import type { HistoryOperation, TreeOperation } from '@worktree/core';
+import type { HistoryOperation, Operation, TreeOperation } from '@worktree/core';
 import { validateOps } from '../src/validation';
 
 const addOp = (parentId: string, id: string): TreeOperation =>
   ({ kind: 'add', parentId, id, name: id, weight: 1 });
 
-const histAdd = (id: string, op: TreeOperation): HistoryOperation => ({ kind: 'add', id, op });
+const histAdd = (id: string, op: Operation): HistoryOperation => ({ kind: 'add', id, op });
 
 describe('validateOps', () => {
   it('accepts ops that apply cleanly to the current tree', () => {
@@ -72,6 +72,58 @@ describe('validateOps', () => {
     const state = WorktreeState.fromOps([addOp(ROOT_ID, 'a'), addOp(ROOT_ID, 'b')]);
     expect(validateOps([histAdd('h1', { kind: 'rename', id: 'b', name: 'a' })], state).ok).toBe(false);
     expect(validateOps([histAdd('h1', { kind: 'rename', id: 'b', name: 'b' })], state).ok).toBe(true);
+  });
+
+  it('rejects completing a node while any child is uncompleted', () => {
+    const state = WorktreeState.fromOps([addOp(ROOT_ID, 'a'), addOp('a', 'b')]);
+    const result = validateOps([histAdd('h1', { kind: 'complete', id: 'a' })], state);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('child "b" is not completed');
+  });
+
+  it('accepts completing children before their parent within the same batch', () => {
+    const state = WorktreeState.fromOps([addOp(ROOT_ID, 'a'), addOp('a', 'b')]);
+    const result = validateOps(
+      [
+        histAdd('h1', { kind: 'complete', id: 'b' }),
+        histAdd('h2', { kind: 'complete', id: 'a' }),
+      ],
+      state,
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts uncompleting a child of a completed parent (cascade is derived, not rejected)', () => {
+    const state = WorktreeState.fromOps([
+      addOp(ROOT_ID, 'a'),
+      addOp('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    const result = validateOps([histAdd('h1', { kind: 'uncomplete', id: 'b' })], state);
+    expect(result.ok).toBe(true);
+  });
+
+  it('accepts adding a node under a completed parent (the parent is derived-uncompleted)', () => {
+    const state = WorktreeState.fromOps([
+      addOp(ROOT_ID, 'a'),
+      addOp('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    const result = validateOps([histAdd('h1', addOp('a', 'c'))], state);
+    expect(result.ok).toBe(true);
+  });
+
+  it('rejects completing a block whose linked node has uncompleted children', () => {
+    const state = WorktreeState.fromOps([
+      addOp(ROOT_ID, 'a'),
+      addOp('a', 'b'),
+      { kind: 'add_block', id: 'blk', name: 'B', start: 0, end: 10, nodeId: 'a' },
+    ]);
+    const result = validateOps([histAdd('h1', { kind: 'complete_block', id: 'blk' })], state);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toContain('child "b" is not completed');
   });
 
   it('rejects moving into a parent with a same-named child', () => {
