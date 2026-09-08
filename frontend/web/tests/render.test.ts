@@ -30,15 +30,15 @@ describe('formatNode', () => {
     expect(formatNode(n, fullDisplay)).toBe('a [aaaa] ✔ w:1');
   });
 
-  it('shows reminders inline with ISO deadline, repeat and inactive marker', () => {
+  it('shows reminders inline with local deadline, repeat and inactive marker', () => {
     const n = node([
       { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'a', weight: 1 },
-      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r1', name: 'R', deadline: 1000, repeat: 60 },
-      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r2', name: 'S', deadline: 2000 },
+      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r1', name: 'R', deadline: new Date(1970, 0, 1, 0, 0, 1).getTime(), repeat: 60 },
+      { kind: 'add_reminder', nodeId: 'aaaa-1', rmdId: 'r2', name: 'S', deadline: new Date(1970, 0, 1, 0, 0, 2).getTime() },
       { kind: 'edit_reminder', rmdId: 'r2', active: false },
     ]);
     const out = formatNode(n, fullDisplay);
-    expect(out).toContain('R(2):R@1970-01-01T00:00:01.000Z+60ms, S@1970-01-01T00:00:02.000Z/off');
+    expect(out).toContain('R(2):R@1970-01-01 00:00:01+60ms, S@1970-01-01 00:00:02/off');
   });
 
   it('honors display toggles', () => {
@@ -55,24 +55,34 @@ describe('formatNode', () => {
 
   it('shows deadline and note tokens only when present', () => {
     const n = node([
-      { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'a', weight: 1, deadline: 1000, note: 'hi' },
+      {
+        kind: 'add',
+        parentId: ROOT_ID,
+        id: 'aaaa-1',
+        name: 'a',
+        weight: 1,
+        deadline: new Date(1970, 0, 1, 0, 0, 1).getTime(),
+        note: 'hi',
+      },
     ]);
-    expect(formatNode(n, fullDisplay)).toBe('a [aaaa] w:1 ⏰1970-01-01T00:00:01.000Z ✎ hi');
+    expect(formatNode(n, fullDisplay)).toBe('a [aaaa] w:1 ⏰1970-01-01 00:00:01 ✎ hi');
     const plain = node([{ kind: 'add', parentId: ROOT_ID, id: 'bbbb-1', name: 'b', weight: 1 }]);
     expect(formatNode(plain, fullDisplay)).toBe('b [bbbb] w:1');
   });
 });
 
 describe('formatReminder', () => {
+  const at1s = new Date(1970, 0, 1, 0, 0, 1).getTime();
+
   it('formats a plain reminder', () => {
-    expect(formatReminder({ id: 'r1', name: 'R', deadline: 1000, active: true })).toBe(
-      'R@1970-01-01T00:00:01.000Z',
+    expect(formatReminder({ id: 'r1', name: 'R', deadline: at1s, active: true })).toBe(
+      'R@1970-01-01 00:00:01',
     );
   });
 
   it('omits the name when absent', () => {
-    expect(formatReminder({ id: 'r1', deadline: 1000, active: true })).toBe(
-      '@1970-01-01T00:00:01.000Z',
+    expect(formatReminder({ id: 'r1', deadline: at1s, active: true })).toBe(
+      '@1970-01-01 00:00:01',
     );
   });
 });

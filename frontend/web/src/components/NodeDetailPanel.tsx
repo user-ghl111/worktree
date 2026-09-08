@@ -6,7 +6,7 @@ import type { WorktreeClient } from '@worktree/client';
 import { useI18n } from '../i18n';
 import { flattenTree, descendants } from '../tree-utils';
 import { formatReminder } from '../render';
-import { epochToLocalInput, formatDeadline, localInputToEpoch } from '../time';
+import { epochToLocalInput, formatLocalDateTime, localInputToEpoch } from '../time';
 import { CheckIcon, ClockIcon, CopyIcon, MoveIcon, NoteIcon, PencilIcon, PlusIcon, TrashIcon, XIcon } from './icons';
 
 const REPEAT_PRESETS: { key: string; ms: number | null }[] = [
@@ -452,13 +452,13 @@ export function NodeDetailPanel(props: {
           <div className="flex gap-2">
             <dt className="w-16 text-gray-500">{t('detail.createdAt')}</dt>
             <dd className="font-mono" data-testid="detail-created">
-              {node.createdAt === 0 ? t('detail.noDeadline') : formatDeadline(node.createdAt)}
+              {node.createdAt === 0 ? t('detail.noDeadline') : formatLocalDateTime(node.createdAt)}
             </dd>
           </div>
           <div className="flex gap-2">
             <dt className="w-16 text-gray-500">{t('detail.deadline')}</dt>
             <dd className="font-mono" data-testid="detail-deadline-value">
-              {node.deadline !== undefined ? formatDeadline(node.deadline) : t('detail.noDeadline')}
+              {node.deadline !== undefined ? formatLocalDateTime(node.deadline) : t('detail.noDeadline')}
             </dd>
           </div>
         </dl>

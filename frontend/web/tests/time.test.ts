@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { epochToLocalInput, formatDeadline, localInputToEpoch } from '../src/time';
+import { epochToLocalInput, formatLocalDateTime, localInputToEpoch } from '../src/time';
 
 describe('time helpers', () => {
   it('formats epoch ms for a datetime-local input with seconds', () => {
@@ -28,7 +28,13 @@ describe('time helpers', () => {
     expect(localInputToEpoch('not a date')).toBeNull();
   });
 
-  it('keeps formatDeadline as ISO', () => {
-    expect(formatDeadline(new Date('2026-08-25T00:00:00Z').getTime())).toBe('2026-08-25T00:00:00.000Z');
+  it('formats local YYYY-MM-DD HH:MM:SS', () => {
+    const ms = new Date(2026, 7, 25, 9, 5, 7).getTime();
+    expect(formatLocalDateTime(ms)).toBe('2026-08-25 09:05:07');
+  });
+
+  it('pads single-digit fields', () => {
+    const ms = new Date(2026, 0, 2, 3, 4, 5).getTime();
+    expect(formatLocalDateTime(ms)).toBe('2026-01-02 03:04:05');
   });
 });
