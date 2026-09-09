@@ -133,8 +133,8 @@ describe('completeLine — subcommands and flags', () => {
 
   it('completes reminder ids for reminder rm/edit', () => {
     const tree = build();
-    tree.getNode('aaaa-1')!.reminders.push({ id: 'rmd-1234', name: 'R', deadline: 1, active: true });
-    tree.getNode('bbbb-1')!.reminders.push({ id: 'rmd-5678', name: 'R2', deadline: 2, active: false });
+    tree.getNode('aaaa-1')!.reminders.push({ id: 'rmd-1234', name: 'R', deadline: 1, active: true, auto: false });
+    tree.getNode('bbbb-1')!.reminders.push({ id: 'rmd-5678', name: 'R2', deadline: 2, active: false, auto: false });
     const root = tree.getRoot();
     expect(completeLine(root, ROOT_ID, 'reminder rm ')[0]).toEqual(['rmd-1234', 'rmd-5678']);
     expect(completeLine(root, ROOT_ID, 'reminder rm rmd-5')[0]).toEqual(['rmd-5678 ']);
