@@ -83,6 +83,72 @@ describe('NodeDetailPanel remove confirmation', () => {
   });
 });
 
+describe('NodeDetailPanel complete confirmation', () => {
+  it('completes without prompting when every child is already completed', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const node = makeNode(
+      [
+        { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'alpha', weight: 1 },
+        { kind: 'add', parentId: 'aaaa-1', id: 'bbbb-1', name: 'beta', weight: 1 },
+        { kind: 'complete', id: 'bbbb-1' },
+      ],
+      'aaaa-1',
+    );
+    const client = makeClient(node);
+    renderPanel(node, client);
+    fireEvent.click(screen.getByTestId('detail-complete'));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(client.setCompleted).toHaveBeenCalledWith('aaaa-1', true);
+  });
+
+  it('prompts when children are uncompleted and respects a cancel', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
+    const node = makeNode(
+      [
+        { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'alpha', weight: 1 },
+        { kind: 'add', parentId: 'aaaa-1', id: 'bbbb-1', name: 'beta', weight: 1 },
+      ],
+      'aaaa-1',
+    );
+    const client = makeClient(node);
+    renderPanel(node, client);
+    fireEvent.click(screen.getByTestId('detail-complete'));
+    expect(confirmSpy).toHaveBeenCalled();
+    expect(client.setCompleted).not.toHaveBeenCalled();
+  });
+
+  it('completes uncompleted descendants bottom-up when the prompt is accepted', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const node = makeNode(
+      [
+        { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'alpha', weight: 1 },
+        { kind: 'add', parentId: 'aaaa-1', id: 'bbbb-1', name: 'beta', weight: 1 },
+        { kind: 'add', parentId: 'bbbb-1', id: 'cccc-1', name: 'gamma', weight: 1 },
+      ],
+      'aaaa-1',
+    );
+    const client = makeClient(node);
+    renderPanel(node, client);
+    fireEvent.click(screen.getByTestId('detail-complete'));
+    expect(client.setCompleted).toHaveBeenNthCalledWith(1, 'cccc-1', true);
+    expect(client.setCompleted).toHaveBeenNthCalledWith(2, 'bbbb-1', true);
+    expect(client.setCompleted).toHaveBeenNthCalledWith(3, 'aaaa-1', true);
+  });
+
+  it('uncompletes without prompting when the node is completed', () => {
+    const confirmSpy = vi.spyOn(window, 'confirm');
+    const node = makeNode(
+      [{ kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'alpha', weight: 1 }, { kind: 'complete', id: 'aaaa-1' }],
+      'aaaa-1',
+    );
+    const client = makeClient(node);
+    renderPanel(node, client);
+    fireEvent.click(screen.getByTestId('detail-complete'));
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(client.setCompleted).toHaveBeenCalledWith('aaaa-1', false);
+  });
+});
+
 describe('NodeDetailPanel note and deadline editing', () => {
   const nodeWithFields = (): Node =>
     makeNode(

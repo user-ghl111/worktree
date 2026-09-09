@@ -82,6 +82,7 @@ describe('Tree', () => {
       add(ROOT_ID, 'c', 2),
       { kind: 'rename', id: 'c', name: 'C2' },
       { kind: 'move', id: 'c', parentId: 'a', weight: 0 },
+      { kind: 'complete', id: 'c' },
       { kind: 'complete', id: 'a' },
     ]);
     expect(tree.getNode('a')?.status).toBe(true);
@@ -118,6 +119,7 @@ describe('Tree', () => {
     const tree = Tree.fromOps([
       add(ROOT_ID, 'a', 1),
       add('a', 'b'),
+      { kind: 'complete', id: 'b' },
       { kind: 'complete', id: 'a' },
       { kind: 'add_reminder', nodeId: 'a', rmdId: 'r1', name: 'R', deadline: 100 },
       { kind: 'copy', id: 'a', parentId: ROOT_ID, newId: 'a2', weight: 5, name: 'a-copy' },
@@ -254,6 +256,7 @@ describe('Tree', () => {
       add(ROOT_ID, 'c', 2),
       { kind: 'rename', id: 'c', name: 'C2' },
       { kind: 'move', id: 'c', parentId: 'a', weight: 0 },
+      { kind: 'complete', id: 'c' },
       { kind: 'complete', id: 'a' },
       { kind: 'add_reminder', nodeId: 'a', rmdId: 'r1', name: 'R', deadline: 100 },
       { kind: 'edit_reminder', rmdId: 'r1', deadline: 200, active: false },
@@ -301,6 +304,132 @@ describe('Tree', () => {
     const tree = Tree.fromOps([add(ROOT_ID, 'a'), { kind: 'complete', id: 'a' }]);
     tree.apply({ kind: 'uncomplete', id: 'a' });
     expect(tree.getNode('a')?.status).toBe(false);
+  });
+
+  it('rejects completing a node while any child is uncompleted', () => {
+    const tree = Tree.fromOps([add(ROOT_ID, 'a'), add('a', 'b')]);
+    expect(() => tree.apply({ kind: 'complete', id: 'a' })).toThrow(/child "b" is not completed/);
+    expect(tree.getNode('a')?.status).toBe(false);
+    tree.apply({ kind: 'complete', id: 'b' });
+    tree.apply({ kind: 'complete', id: 'a' });
+    expect(tree.getNode('a')?.status).toBe(true);
+  });
+
+  it('rejects completing a node while a deeper descendant is uncompleted', () => {
+    const tree = Tree.fromOps([add(ROOT_ID, 'a'), add('a', 'b'), add('b', 'c')]);
+    expect(() => tree.apply({ kind: 'complete', id: 'b' })).toThrow(/child "c" is not completed/);
+    tree.apply({ kind: 'complete', id: 'c' });
+    tree.apply({ kind: 'complete', id: 'b' });
+    tree.apply({ kind: 'complete', id: 'a' });
+    expect(tree.getNode('a')?.status).toBe(true);
+  });
+
+  it('uncompleting a child uncompletes its completed ancestors', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    tree.apply({ kind: 'uncomplete', id: 'b' });
+    expect(tree.getNode('b')?.status).toBe(false);
+    expect(tree.getNode('a')?.status).toBe(false);
+    expect(tree.getNode('a')?.completedAt).toBe(0);
+  });
+
+  it('uncompleting a leaf cascades through the whole ancestor chain', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      add('b', 'c'),
+      { kind: 'complete', id: 'c' },
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    tree.apply({ kind: 'uncomplete', id: 'c' });
+    expect(tree.getNode('c')?.status).toBe(false);
+    expect(tree.getNode('b')?.status).toBe(false);
+    expect(tree.getNode('a')?.status).toBe(false);
+  });
+
+  it('uncompleting a child leaves unrelated completed siblings untouched', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      add('a', 'sibling'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'sibling' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    tree.apply({ kind: 'uncomplete', id: 'b' });
+    expect(tree.getNode('a')?.status).toBe(false);
+    expect(tree.getNode('sibling')?.status).toBe(true);
+  });
+
+  it('adding a node under a completed parent uncompletes the ancestors', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    tree.apply({ kind: 'add', parentId: 'a', id: 'new', name: 'new', weight: 3 });
+    expect(tree.getNode('a')?.status).toBe(false);
+    expect(tree.getNode('new')?.status).toBe(false);
+  });
+
+  it('moving an uncompleted node under a completed parent uncompletes the ancestors', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+      add(ROOT_ID, 'x'),
+    ]);
+    tree.apply({ kind: 'move', id: 'x', parentId: 'a', weight: 1 });
+    expect(tree.getParentId('x')).toBe('a');
+    expect(tree.getNode('a')?.status).toBe(false);
+  });
+
+  it('moving a completed node under a completed parent keeps both completed', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+      add(ROOT_ID, 'x'),
+      { kind: 'complete', id: 'x' },
+    ]);
+    tree.apply({ kind: 'move', id: 'x', parentId: 'a', weight: 1 });
+    expect(tree.getNode('a')?.status).toBe(true);
+    expect(tree.getNode('x')?.status).toBe(true);
+  });
+
+  it('copying an uncompleted node under a completed parent uncompletes the ancestors', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+      add(ROOT_ID, 'x'),
+    ]);
+    tree.apply({ kind: 'copy', id: 'x', parentId: 'a', newId: 'x2', weight: 1, name: 'x2' });
+    expect(tree.getNode('a')?.status).toBe(false);
+    expect(tree.getNode('x2')?.status).toBe(false);
+  });
+
+  it('copying a completed node under a completed parent keeps it completed', () => {
+    const tree = Tree.fromOps([
+      add(ROOT_ID, 'a'),
+      add('a', 'b'),
+      { kind: 'complete', id: 'b' },
+      { kind: 'complete', id: 'a' },
+      add(ROOT_ID, 'x'),
+      { kind: 'complete', id: 'x' },
+    ]);
+    tree.apply({ kind: 'copy', id: 'x', parentId: 'a', newId: 'x2', weight: 1, name: 'x2' });
+    expect(tree.getNode('a')?.status).toBe(true);
+    expect(tree.getNode('x2')?.status).toBe(true);
   });
 
   it('removing an already-removed node is a no-op (idempotent)', () => {

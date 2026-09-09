@@ -343,6 +343,51 @@ describe('command dispatcher', () => {
     expect(lines[0]).toMatch(/^invalid status/);
   });
 
+  it('cpl warns when children are uncompleted and requires -f to force', async () => {
+    const { io, lines } = newIO();
+    await run(io, 'add alpha');
+    await run(io, 'cd alpha');
+    await run(io, 'add beta');
+    await run(io, 'cd /');
+    lines.length = 0;
+    await run(io, 'cpl alpha');
+    expect(lines[0]).toMatch(/uncompleted child node\(s\) — use cpl -f to complete them first/);
+    expect(io.client.getTree().children[0]?.status).toBe(false);
+    lines.length = 0;
+    await run(io, 'cpl -f alpha');
+    const alpha = io.client.getTree().children[0]!;
+    expect(alpha.status).toBe(true);
+    expect(alpha.children[0]?.status).toBe(true);
+  });
+
+  it('cpl -f completes deeper descendants bottom-up', async () => {
+    const { io } = newIO();
+    await run(io, 'add alpha');
+    await run(io, 'cd alpha');
+    await run(io, 'add beta');
+    await run(io, 'cd beta');
+    await run(io, 'add gamma');
+    await run(io, 'cd /');
+    await run(io, 'cpl -f alpha');
+    const alpha = io.client.getTree().children[0]!;
+    expect(alpha.status).toBe(true);
+    expect(alpha.children[0]?.status).toBe(true);
+    expect(alpha.children[0]?.children[0]?.status).toBe(true);
+  });
+
+  it('cpl completes a node whose children are all completed without -f', async () => {
+    const { io, lines } = newIO();
+    await run(io, 'add alpha');
+    await run(io, 'cd alpha');
+    await run(io, 'add beta');
+    await run(io, 'cpl beta');
+    await run(io, 'cd /');
+    lines.length = 0;
+    await run(io, 'cpl alpha');
+    expect(io.client.getTree().children[0]?.status).toBe(true);
+    expect(lines[0]).toBe('alpha completed');
+  });
+
   it('ls respects the filter in hide mode', async () => {
     const { io, lines } = newIO();
     await run(io, 'add alpha');

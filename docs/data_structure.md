@@ -102,6 +102,12 @@ add's note/deadline/created_at are optional: they default to '', unset and 0.
 Clients no longer send created_at — replay derives it from the op timestamp
 (created_at wins when both are present, for legacy reads). A complete op
 records its timestamp as the node's completedAt; uncomplete clears it.
+A node may only be completed once all of its children are completed (the
+check applies to complete_block too, via the propagated node status).
+The reverse is derived, inside a single apply and without recording a history
+op: uncompleting a node — or introducing an uncompleted node under a completed
+parent (add/move/copy) — uncompletes every completed ancestor in turn, so a
+completed node never has an uncompleted child in the derived state.
 An empty edit_node or edit_reminder patch (no fields at all) is rejected.
 
 copy is shallow: copies name, status, reminders, note, deadline and completedAt,
