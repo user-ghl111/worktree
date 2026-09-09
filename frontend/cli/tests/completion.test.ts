@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ROOT_ID, Tree } from '@worktree/core';
 import { COMMANDS, completeLine } from '../src/completion';
+
+vi.mock('../src/users', () => ({
+  listUsers: () => ['ghl', 'local'],
+}));
 
 const build = () =>
   Tree.fromOps([
