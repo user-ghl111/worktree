@@ -91,6 +91,7 @@ export const messages: Record<string, StringMap> = {
       copyNote: 'Copy is shallow: name, status, reminders, note and deadline — no children.',
       remove: 'Remove',
       confirmRemove: 'Remove "{name}" and its whole subtree?',
+      confirmCompleteTree: 'Complete "{name}" and its {count} uncompleted child node(s)?',
       close: 'Close',
       createdAt: 'Created',
       deadline: 'Deadline',

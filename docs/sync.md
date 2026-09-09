@@ -70,7 +70,14 @@ process ops in order, atomically:
         the user's current head (only the head may be undone)
       add: parent exists, new_id unused, name valid (non-empty, no '/'), no sibling name collision
       remove/remove_reminder: no-op when the target is already gone (idempotent, concurrent removes commute)
-      rename/complete/uncomplete: target exists; rename: name valid, no sibling collision (self excluded)
+      rename/complete/uncomplete: target exists; rename: name valid, no sibling collision (self excluded);
+        complete: all of the node's children must already be completed (checked for
+        the linked node too when a complete_block propagates to it);
+        uncomplete/add/move/copy never fail on completion state — uncompleting a node,
+        or introducing an uncompleted node under a completed parent, derives the
+        ancestors' uncompletion inside the apply (see data_structure.md), so the
+        resulting history always replays to a state with no uncompleted child
+        under a completed node
       move/copy: target exists, new_parent exists; move must not create a cycle;
         no sibling name collision in the new parent (copy: with its effective name)
       add_reminder: node exists

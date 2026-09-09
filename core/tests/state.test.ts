@@ -38,16 +38,68 @@ describe('WorktreeState', () => {
     expect(nodeOf(state, 'a').status).toBe(true);
   });
 
+  it('rejects completing a block whose linked node has uncompleted children', () => {
+    const state = WorktreeState.fromOps([add('a'), add('a-child', 'a'), block('b1', 'a')]);
+    expect(() => state.apply({ kind: 'complete_block', id: 'b1' })).toThrow(/child "a-child" is not completed/);
+    expect(nodeOf(state, 'a').status).toBe(false);
+    state.apply({ kind: 'complete', id: 'a-child' });
+    state.apply({ kind: 'complete_block', id: 'b1' });
+    expect(nodeOf(state, 'a').status).toBe(true);
+    expect(blockById(state, 'b1').status).toBe(true);
+  });
+
+  it('uncompleting a child uncompletes the parent node and its linked block', () => {
+    const state = WorktreeState.fromOps([
+      add('a'),
+      add('a-child', 'a'),
+      block('b1', 'a'),
+      { kind: 'complete', id: 'a-child' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    state.apply({ kind: 'uncomplete', id: 'a-child' });
+    expect(nodeOf(state, 'a').status).toBe(false);
+    expect(blockById(state, 'b1').status).toBe(false);
+  });
+
+  it('uncompleting a block cascades to the ancestors and their blocks', () => {
+    const state = WorktreeState.fromOps([
+      add('a'),
+      add('a-child', 'a'),
+      block('b1', 'a-child'),
+      { kind: 'complete', id: 'a-child' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    state.apply({ kind: 'uncomplete_block', id: 'b1' });
+    expect(nodeOf(state, 'a-child').status).toBe(false);
+    expect(nodeOf(state, 'a').status).toBe(false);
+    expect(blockById(state, 'b1').status).toBe(false);
+  });
+
+  it('adding a node under a completed parent uncompletes the parent and its linked block', () => {
+    const state = WorktreeState.fromOps([
+      add('a'),
+      add('a-child', 'a'),
+      block('b1', 'a'),
+      { kind: 'complete', id: 'a-child' },
+      { kind: 'complete', id: 'a' },
+    ]);
+    state.apply({ kind: 'add', parentId: 'a', id: 'fresh', name: 'fresh', weight: 1 });
+    expect(nodeOf(state, 'a').status).toBe(false);
+    expect(blockById(state, 'b1').status).toBe(false);
+  });
+
   it('uncompleting a block uncompletes its linked node', () => {
     const state = WorktreeState.fromOps([add('a'), block('b1', 'a'), { kind: 'complete_block', id: 'b1' }]);
     state.apply({ kind: 'uncomplete_block', id: 'b1' });
     expect(nodeOf(state, 'a').status).toBe(false);
   });
 
-  it('completing a parent does not touch blocks of descendant nodes', () => {
+  it('completing a parent only touches blocks directly linked to it, not descendants', () => {
     const state = WorktreeState.fromOps([add('a'), add('a-child', 'a'), block('b1', 'a-child')]);
+    state.apply({ kind: 'complete', id: 'a-child' });
+    expect(blockById(state, 'b1').status).toBe(true); // in sync with its node
     state.apply({ kind: 'complete', id: 'a' });
-    expect(blockById(state, 'b1').status).toBe(false);
+    expect(blockById(state, 'b1').status).toBe(true); // unchanged by the parent's complete
   });
 
   it('node ops leave standalone blocks alone', () => {

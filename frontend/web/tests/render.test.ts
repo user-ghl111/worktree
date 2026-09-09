@@ -75,13 +75,21 @@ describe('formatReminder', () => {
   const at1s = new Date(1970, 0, 1, 0, 0, 1).getTime();
 
   it('formats a plain reminder', () => {
+<<<<<<< HEAD
     expect(formatReminder({ id: 'r1', name: 'R', deadline: at1s, active: true, auto: false })).toBe(
+=======
+    expect(formatReminder({ id: 'r1', name: 'R', deadline: at1s, active: true })).toBe(
+>>>>>>> d9eae608c6cbc8ca093e10c72a7015c3579a4304
       'R@1970-01-01 00:00:01',
     );
   });
 
   it('omits the name when absent', () => {
+<<<<<<< HEAD
     expect(formatReminder({ id: 'r1', deadline: at1s, active: true, auto: false })).toBe(
+=======
+    expect(formatReminder({ id: 'r1', deadline: at1s, active: true })).toBe(
+>>>>>>> d9eae608c6cbc8ca093e10c72a7015c3579a4304
       '@1970-01-01 00:00:01',
     );
   });

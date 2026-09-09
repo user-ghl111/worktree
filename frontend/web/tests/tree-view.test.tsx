@@ -12,8 +12,9 @@ const display: DisplayPrefs = { showId: true, showWeight: true, showReminders: t
 
 const tree = Tree.fromOps([
   { kind: 'add', parentId: ROOT_ID, id: 'aaaa-1', name: 'alpha', weight: 1 },
-  { kind: 'complete', id: 'aaaa-1' },
   { kind: 'add', parentId: 'aaaa-1', id: 'bbbb-1', name: 'beta', weight: 1 },
+  { kind: 'complete', id: 'bbbb-1' },
+  { kind: 'complete', id: 'aaaa-1' },
   { kind: 'add', parentId: ROOT_ID, id: 'cccc-1', name: 'gamma', weight: 2 },
 ]).getRoot();
 
@@ -62,7 +63,7 @@ describe('TreeView', () => {
     expect(view.textContent).toContain('├── gamma [cccc] w:2');
     // the double space is the check-mark SVG slot, which has no text content
     expect(view.textContent).toContain('└── alpha [aaaa]  w:1');
-    expect(view.textContent).toContain('    └── beta [bbbb] w:1');
+    expect(view.textContent).toContain('    └── beta [bbbb]  w:1');
   });
 
   it('colors completed rows green and uncompleted rows yellow', () => {

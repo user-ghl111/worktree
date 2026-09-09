@@ -237,6 +237,39 @@ describe('WorktreeClient semantic operations', () => {
       expect(() => c.addBlock({ name: 'B', start: 0, end: 10, nodeId: 'missing' })).toThrow(/unknown node id/);
     });
 
+    it('uncompleting a child derives the parent uncomplete through the replay', () => {
+      const c = newClient();
+      const a = c.addNode(ROOT_ID, 'A');
+      const b = c.addNode(a, 'B');
+      c.setCompleted(b, true);
+      c.setCompleted(a, true);
+      expect(c.getTree().children[0].status).toBe(true);
+      c.setCompleted(b, false);
+      expect(c.getTree().children[0].status).toBe(false);
+    });
+
+    it('setCompleted rejects a node with uncompleted children', () => {
+      const c = newClient();
+      const a = c.addNode(ROOT_ID, 'A');
+      const b = c.addNode(a, 'B');
+      expect(() => c.setCompleted(a, true)).toThrow(/child "B" is not completed/);
+      expect(c.getTree().children[0].status).toBe(false);
+      c.setCompleted(b, true);
+      c.setCompleted(a, true);
+      expect(c.getTree().children[0].status).toBe(true);
+    });
+
+    it('setBlockCompleted rejects a block whose linked node has uncompleted children', () => {
+      const c = newClient();
+      const a = c.addNode(ROOT_ID, 'A');
+      const b = c.addNode(a, 'B');
+      const id = c.addBlock({ name: 'BLK', start: 0, end: 10, nodeId: a });
+      expect(() => c.setBlockCompleted(id, true)).toThrow(/child "B" is not completed/);
+      c.setCompleted(b, true);
+      c.setBlockCompleted(id, true);
+      expect(c.getBlocks()[0].status).toBe(true);
+    });
+
     it('setBlockCompleted propagates to the linked node through the replay', () => {
       const c = newClient();
       const a = c.addNode(ROOT_ID, 'A');
