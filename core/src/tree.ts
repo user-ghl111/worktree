@@ -157,7 +157,7 @@ export class Tree {
           active: true,
           auto: op.auto ?? false,
         });
-        break;
+        return [];
       }
       case 'remove_reminder': {
         const node = this.findReminderNode(op.rmdId);
